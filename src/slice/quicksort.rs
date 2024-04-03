@@ -8,6 +8,7 @@ use std::cmp;
 use std::marker::PhantomData;
 use std::mem::{self, MaybeUninit};
 use std::ptr;
+use indicatif::{ProgressBar, ProgressStyle};
 
 /// When dropped, copies from `src` into `dest`.
 #[must_use]
@@ -744,7 +745,7 @@ where
 ///
 /// `limit` is the number of allowed imbalanced partitions before switching to `heapsort`. If zero,
 /// this function will immediately switch to heapsort.
-fn recurse<'a, T, F>(mut v: &'a mut [T], is_less: &F, mut pred: Option<&'a mut T>, mut limit: u32)
+fn recurse<'a, T, F>(mut v: &'a mut [T], is_less: &F, mut pred: Option<&'a mut T>, mut limit: u32, pbar: &ProgressBar)
 where
     T: Send,
     F: Fn(&T, &T) -> bool + Sync,
@@ -824,18 +825,19 @@ where
             // calls and consume less stack space. Then just continue with the longer side (this is
             // akin to tail recursion).
             if left.len() < right.len() {
-                recurse(left, is_less, pred, limit);
+                recurse(left, is_less, pred, limit, pbar);
                 v = right;
                 pred = Some(pivot);
             } else {
-                recurse(right, is_less, Some(pivot), limit);
+                recurse(right, is_less, Some(pivot), limit, pbar);
                 v = left;
             }
         } else {
+            pbar.inc(1);
             // Sort the left and right half in parallel.
             rayon_core::join(
-                || recurse(left, is_less, pred, limit),
-                || recurse(right, is_less, Some(pivot), limit),
+                || recurse(left, is_less, pred, limit, pbar),
+                || recurse(right, is_less, Some(pivot), limit, pbar),
             );
             break;
         }
@@ -857,8 +859,11 @@ where
 
     // Limit the number of imbalanced partitions to `floor(log2(len)) + 1`.
     let limit = usize::BITS - v.len().leading_zeros();
-
-    recurse(v, &is_less, None, limit);
+    let pbar = ProgressBar::new((v.len() as f64 / 2000.0).ceil() as u64);
+    pbar.set_style(ProgressStyle::with_template("{elapsed} elapsed (estimated duration {duration}) {bar:80}")
+    .unwrap());
+    recurse(v, &is_less, None, limit, &pbar);
+    pbar.finish();
 }
 
 #[cfg(test)]
