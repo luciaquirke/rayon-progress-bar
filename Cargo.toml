@@ -1,8 +1,10 @@
 [package]
-name = "rayon"
+name = "rayon-progress-bar"
 version = "1.9.0"
 authors = ["Niko Matsakis <niko@alum.mit.edu>",
-           "Josh Stone <cuviper@gmail.com>"]
+           "Josh Stone <cuviper@gmail.com>",
+           "Lucia Quirke <luciarosequirke@gmail.com",
+           ]
 description = "Simple work-stealing parallelism for Rust"
 rust-version = "1.63"
 edition = "2021"
